@@ -336,7 +336,7 @@ async function refresh() {
   } else {
     iTbody.innerHTML = inFlight.map((i) =>
       '<tr><td class="id-cell">' + esc(i.id) + '</td><td>' + esc(i.workType) + '</td><td>' + i.status + '</td><td>' + i.attempts + '</td><td>' + (i.dispatchedTo ? esc(i.dispatchedTo) : '&mdash;') + '</td>' +
-      '<td>' + (i.status === 'dispatched' ? '<button class="btn" onclick="forceRedeliver(' + JSON.stringify(i.id) + ', this)">Force redeliver</button>' : '') + '</td></tr>'
+      '<td>' + (i.status === 'dispatched' ? "<button class=\"btn\" onclick='forceRedeliver(" + JSON.stringify(i.id) + ", this)'>Force redeliver</button>" : '') + '</td></tr>'
     ).join('');
   }
 
@@ -346,7 +346,7 @@ async function refresh() {
   } else {
     wTbody.innerHTML = workers.workers.map((w) =>
       '<tr><td class="id-cell">' + esc(w.id) + '</td><td><span class="pill ' + w.status + '">' + w.status + '</span></td><td>' + ageStr(w.heartbeatAgeMs) + '</td>' +
-      '<td><button class="btn" onclick="killWorker(' + JSON.stringify(w.id) + ', this)" ' + (w.status === 'missing' ? 'disabled title="already not responding"' : '') + '>Kill</button></td></tr>'
+      "<td><button class=\"btn\" onclick='killWorker(" + JSON.stringify(w.id) + ", this)' " + (w.status === 'missing' ? 'disabled title="already not responding"' : '') + '>Kill</button></td></tr>'
     ).join('');
   }
 
@@ -372,7 +372,7 @@ async function refresh() {
   } else {
     dTbody.innerHTML = deadItems.map((i) =>
       '<tr><td class="id-cell">' + esc(i.id) + '</td><td>' + esc(i.workType) + '</td><td>' + i.attempts + '</td><td>' + fmtTime(i.deadLetteredAt) + '</td><td>' + esc(i.deadLetterReason) + '</td>' +
-      '<td><button class="btn" onclick="revive(' + JSON.stringify(i.id) + ', this)">Revive</button></td></tr>'
+      "<td><button class=\"btn\" onclick='revive(" + JSON.stringify(i.id) + ", this)'>Revive</button></td></tr>"
     ).join('');
   }
 
@@ -382,7 +382,7 @@ async function refresh() {
   } else {
     rTbody.innerHTML = releases.services.map((s) =>
       '<tr><td class="id-cell">' + esc(s.service) + '</td><td>' + esc(s.current) + '</td><td>' + (s.previous ? esc(s.previous) : '<span class="empty" style="padding:0">none</span>') + '</td>' +
-      '<td><button class="btn" onclick="rollbackService(' + JSON.stringify(s.service) + ', this)" ' + (s.previous ? '' : 'disabled title="nothing to roll back to"') + '>Rollback</button></td></tr>'
+      "<td><button class=\"btn\" onclick='rollbackService(" + JSON.stringify(s.service) + ", this)' " + (s.previous ? '' : 'disabled title="nothing to roll back to"') + '>Rollback</button></td></tr>'
     ).join('');
   }
 
