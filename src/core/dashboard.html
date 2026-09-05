@@ -138,6 +138,7 @@
       <input class="type" id="releaseVersion" type="text" placeholder="version, e.g. v2-crash">
       <button class="btn primary" onclick="pushRelease()">Push release</button>
     </div>
+    <div class="hint">Leave "service" as <b>inventory-worker</b> unless you started a worker yourself with a different <code>--service=</code> flag &ndash; a release only changes behaviour for a worker actually polling that exact service name. Version names containing "crash" make that service's worker crash on every item; anything else runs normally.</div>
     <div class="toast" id="releaseToast"></div>
     <div class="tablewrap">
       <table id="releasesTable">
