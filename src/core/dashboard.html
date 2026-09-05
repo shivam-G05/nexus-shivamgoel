@@ -132,6 +132,22 @@
   <div class="gridstats" id="statGrid"></div>
 
   <section>
+    <div class="sechead"><h2>Releases</h2></div>
+    <div class="submitrow">
+      <input class="type" id="releaseService" type="text" placeholder="service" value="inventory-worker">
+      <input class="type" id="releaseVersion" type="text" placeholder="version, e.g. v2-crash">
+      <button class="btn primary" onclick="pushRelease()">Push release</button>
+    </div>
+    <div class="toast" id="releaseToast"></div>
+    <div class="tablewrap">
+      <table id="releasesTable">
+        <thead><tr><th>Service</th><th>Current version</th><th>Previous version</th><th></th></tr></thead>
+        <tbody><tr><td colspan="4" class="empty">No release pushed yet for any service.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <div class="sechead"><h2>Send test work</h2></div>
     <div class="submitrow">
       <input class="id" id="submitId" type="text" placeholder="id (leave blank to auto-generate)">
@@ -222,10 +238,10 @@ async function postJson(path, body) {
 }
 
 async function refresh() {
-  let status, workers, config, recentReleases, recentActivity;
+  let status, workers, config, recentReleases, recentActivity, releases;
   try {
-    [status, workers, config, recentReleases, recentActivity] = await Promise.all([
-      getJson('/status'), getJson('/workers'), getJson('/config'), getJson('/history?type=release&limit=20'), getJson('/history?limit=30')
+    [status, workers, config, recentReleases, recentActivity, releases] = await Promise.all([
+      getJson('/status'), getJson('/workers'), getJson('/config'), getJson('/history?type=release&limit=20'), getJson('/history?limit=30'), getJson('/releases')
     ]);
     document.getElementById('liveDot').classList.remove('off');
   } catch (err) {
@@ -338,6 +354,16 @@ async function refresh() {
     ).join('');
   }
 
+  const rTbody = document.querySelector('#releasesTable tbody');
+  if (releases.services.length === 0) {
+    rTbody.innerHTML = '<tr><td colspan="4" class="empty">No release pushed yet for any service.</td></tr>';
+  } else {
+    rTbody.innerHTML = releases.services.map((s) =>
+      '<tr><td class="id-cell">' + esc(s.service) + '</td><td>' + esc(s.current) + '</td><td>' + (s.previous ? esc(s.previous) : '<span class="empty" style="padding:0">none</span>') + '</td>' +
+      '<td><button class="btn" onclick="rollbackService(' + JSON.stringify(s.service) + ', this)" ' + (s.previous ? '' : 'disabled title="nothing to roll back to"') + '>Rollback</button></td></tr>'
+    ).join('');
+  }
+
   document.getElementById('settingsBody').innerHTML =
     'retry &middot; first wait <b>' + config.retry.firstWaitMs + 'ms</b>, +<b>' + config.retry.backoffMs + 'ms</b>/attempt, max <b>' + config.retry.maxAttempts + '</b> attempts<br>' +
     'heartbeat &middot; stale after <b>' + config.heartbeatStaleMs + 'ms</b><br>' +
@@ -380,6 +406,53 @@ async function revive(id, btn) {
     btn.disabled = false;
     btn.textContent = 'Revive';
     alert('Could not revive ' + id + ': ' + err.message);
+  }
+}
+
+// Pushes a version pointer for a named service - logged into the same
+// event stream as everything else, which is what puts it on the same
+// timeline as whatever fails right after it (R-07).
+async function pushRelease() {
+  const serviceInput = document.getElementById('releaseService');
+  const versionInput = document.getElementById('releaseVersion');
+  const toast = document.getElementById('releaseToast');
+  const service = serviceInput.value.trim();
+  const version = versionInput.value.trim();
+  if (!service || !version) {
+    toast.className = 'toast err';
+    toast.textContent = 'Both service and version are required.';
+    return;
+  }
+  toast.className = 'toast';
+  toast.textContent = 'Pushing&hellip;';
+  try {
+    const { ok, data } = await postJson('/release', { service, version });
+    if (!ok) throw new Error(data.error || 'rejected');
+    toast.className = 'toast ok';
+    toast.textContent = 'Released "' + version + '" for "' + service + '"' + (data.previousVersion ? ' (was "' + data.previousVersion + '")' : ' (first release for this service)') + '.';
+    versionInput.value = '';
+    refresh();
+  } catch (err) {
+    toast.className = 'toast err';
+    toast.textContent = 'Failed: ' + err.message;
+  }
+}
+document.getElementById('releaseVersion').addEventListener('keydown', (e) => { if (e.key === 'Enter') pushRelease(); });
+
+// One action, a known result - refuses cleanly (via the API) if there's
+// nothing to roll back to, rather than guessing.
+async function rollbackService(service, btn) {
+  if (!confirm('Roll back "' + service + '" to its previous version?')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const { ok, data } = await postJson('/rollback', { service });
+    if (!ok) throw new Error(data.error || 'failed');
+    refresh();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Rollback';
+    alert('Could not roll back ' + service + ': ' + err.message);
   }
 }
 
