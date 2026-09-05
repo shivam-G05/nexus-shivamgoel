@@ -102,6 +102,7 @@
   .submitrow input.type { width:170px; }
   input::placeholder { color: #5c6270; }
   input:focus { outline: none; border-color: var(--accent); }
+  input[readonly] { color: var(--text-dim); background: var(--panel-hover); cursor: not-allowed; }
   .hint { font-size:12px; color: var(--text-dim); margin-bottom:14px; }
   .ev-type { font-family: ui-monospace, monospace; font-size:12px; color: var(--accent); }
   .toast { font-size: 12.5px; margin-top: 8px; min-height: 1.2em; }
@@ -134,11 +135,11 @@
   <section>
     <div class="sechead"><h2>Releases</h2></div>
     <div class="submitrow">
-      <input class="type" id="releaseService" type="text" placeholder="service" value="inventory-worker">
+      <input class="type" id="releaseService" type="text" value="inventory-worker" readonly title="fixed - the auto-worker and Send-test-work always use this service">
       <input class="type" id="releaseVersion" type="text" placeholder="version, e.g. v2-crash">
       <button class="btn primary" onclick="pushRelease()">Push release</button>
     </div>
-    <div class="hint">Leave "service" as <b>inventory-worker</b> unless you started a worker yourself with a different <code>--service=</code> flag &ndash; a release only changes behaviour for a worker actually polling that exact service name. Version names containing "crash" make that service's worker crash on every item; anything else runs normally.</div>
+    <div class="hint">"service" is fixed to <b>inventory-worker</b> - the only service the auto-worker (and "Send test work" above) actually listens to. A release for any other name would have no visible effect on anything, so it can't be typed here. Version names containing "crash" make the worker crash on every item; anything else runs normally.</div>
     <div class="toast" id="releaseToast"></div>
     <div class="tablewrap">
       <table id="releasesTable">
