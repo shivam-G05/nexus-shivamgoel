@@ -1,9 +1,18 @@
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const { spawn } = require('child_process');
 const { createEventLog } = require('./eventLog');
 
 const DASHBOARD_FILE = path.join(__dirname, 'dashboard.html');
+const WORKER_SCRIPT = path.join(__dirname, '..', 'worker', 'worker.js');
+
+// Convenience only, not process supervision: if a piece of work arrives
+// and nothing is currently heartbeating, Core starts one default worker
+// so a reviewer isn't forced to open a second terminal just to see work
+// move. Core still never restarts a worker that dies later - that
+// stays a deliberate, visible, on-purpose action (see ACCOUNT.md).
+const AUTO_WORKER = process.env.NEXUS_AUTO_WORKER !== '0';
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 4000;
 const LOG_FILE = process.env.NEXUS_LOG || path.join(__dirname, '..', '..', 'data', 'events.log');
@@ -212,6 +221,34 @@ function workersSummary() {
   return Array.from(workers.keys()).map((id) => ({ id, ...workerHealth(id) }));
 }
 
+function anyWorkerAlive() {
+  const now = Date.now();
+  for (const w of workers.values()) {
+    if (now - w.lastHeartbeatAt <= HEARTBEAT_STALE_MS) return true;
+  }
+  return false;
+}
+
+let autoWorkerPending = false;
+
+function maybeSpawnAutoWorker() {
+  if (!AUTO_WORKER || autoWorkerPending || anyWorkerAlive()) return;
+  autoWorkerPending = true;
+  console.log('[nexus] no worker seen yet - auto-starting one (set NEXUS_AUTO_WORKER=0 to disable)');
+  // Matches the dashboard's pre-filled "service" field, so pushing a
+  // release from the Releases panel affects this worker without the
+  // reviewer having to know or type a matching --service flag.
+  const child = spawn(process.execPath, [WORKER_SCRIPT, '--id=auto-w1', '--service=inventory-worker'], { stdio: 'inherit' });
+  child.on('exit', (code) => {
+    console.log(`[nexus] auto-worker exited (code ${code})`);
+    autoWorkerPending = false; // a later piece of work can spawn a fresh one
+  });
+  child.on('error', (err) => {
+    console.error('[nexus] failed to auto-start a worker:', err.message);
+    autoWorkerPending = false;
+  });
+}
+
 const HISTORY_DEFAULT_LIMIT = 200;
 const HISTORY_MAX_LIMIT = 2000;
 
@@ -315,6 +352,7 @@ const server = http.createServer(async (req, res) => {
         body: payload.body ?? null
       });
       applyEvent(event);
+      maybeSpawnAutoWorker();
       return send(res, 200, { accepted: true, id: payload.id });
     }
 
@@ -542,5 +580,6 @@ server.listen(PORT, () => {
   console.log(`[nexus] event log: ${LOG_FILE}`);
   console.log(`[nexus] retry policy: first wait ${RETRY_BASE_MS}ms, +${RETRY_BACKOFF_MS}ms each attempt, max ${MAX_ATTEMPTS} attempts before dead-letter`);
   console.log(`[nexus] sweep processes at most ${SWEEP_BATCH_LIMIT} timed-out item(s) per ${SWEEP_INTERVAL_MS}ms tick`);
+  console.log(`[nexus] auto-worker: ${AUTO_WORKER ? 'ON - starts one worker on the first piece of work if none is heartbeating' : 'OFF'}`);
 });
 setInterval(sweep, SWEEP_INTERVAL_MS);

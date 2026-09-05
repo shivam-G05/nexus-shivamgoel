@@ -73,6 +73,16 @@ carefully — because in the real system, 40 different teams wrote the
 workers, and trusting all of them to cooperate was the root of the
 incident this handbook is based on.
 
+**Core lazily auto-starts one default worker on the first piece of work**
+if nothing is currently heartbeating (`NEXUS_AUTO_WORKER=0` to disable).
+This is a convenience, not process supervision: Core never restarts a
+worker that dies later on its own — a later piece of work triggers a
+fresh auto-start only because nothing is heartbeating at that moment,
+which is the same rule a human restarting it by hand would trigger.
+The distinction matters because "Core owns and supervises worker
+processes" was deliberately out of scope (see the transport decision
+above); this only ever starts one worker once, lazily, for convenience.
+
 **What would change my mind:** if the size in the brief were "millions,"
 not "a few thousand," the append-only file's O(n) replay-on-boot would
 stop being free, and I'd reach for indexed storage. It isn't, so I didn't.

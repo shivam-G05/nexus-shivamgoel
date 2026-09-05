@@ -47,15 +47,25 @@ set PORT=4000
 
 ## Use (under 2 minutes)
 
-In a second terminal, send some fake work and start a worker to process it:
+Send some fake work — no second terminal required. If nothing is
+currently heartbeating, Core automatically starts one default worker
+the moment the first piece of work arrives (set `NEXUS_AUTO_WORKER=0`
+to disable this and manage workers by hand instead):
+
+```
+curl -X POST http://localhost:4000/work -H "Content-Type: application/json" -d "{\"id\":\"t1\",\"type\":\"demo\",\"body\":{}}"
+```
+
+Watch Core's own terminal — you'll see `auto-starting one worker`,
+then the worker's own log lines as it picks the item up and finishes it.
+
+To send a batch, or run a worker yourself with specific flags (see
+Break below), start them explicitly:
 
 ```
 node src\sender\sender.js --count=5 --interval=800
 node src\worker\worker.js --id=w1 --delay=2000
 ```
-
-Watch the worker's own terminal — it picks items up, "processes" them for
-2 seconds each, and reports done, one at a time.
 
 Open **http://localhost:4000/** in a browser to watch the same thing
 happen live on the operator view, refreshing on its own every second.
