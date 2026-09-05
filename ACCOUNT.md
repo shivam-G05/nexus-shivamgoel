@@ -151,6 +151,21 @@ has no algorithmic step that changes at that scale (no sort, no scan
 that isn't already O(n) at any size), so this is a reasoned extrapolation,
 not a demonstrated one.
 
+**A real bug this exposed:** all four of the dashboard's action buttons
+(Rollback, Kill, Revive, Force redeliver) built their `onclick` handler
+as `onclick="fn(' + JSON.stringify(id) + ', this)"` - a double-quoted
+HTML attribute containing a double-quoted JSON string. The inner quotes
+closed the attribute early, silently truncating it to a broken JS
+fragment; clicking did nothing, with no console error in most cases.
+Every API endpoint behind these buttons was verified repeatedly by
+calling it directly (curl/PowerShell), which never touches HTML
+attribute parsing and so never could have caught this - the bug only
+surfaced once a real click, in a real browser, on the real rendered
+page was reported and traced back. Fixed by switching the outer
+attribute to single quotes. The lesson generalized: API-level testing
+proves the backend logic is right; it does not prove the button wired
+to it actually works.
+
 **Assumed, with a caveat:** the dashboard's visual rendering (colours,
 layout, live-update behaviour as actually seen in a browser) was
 confirmed by opening it in a real browser during the build, and its
