@@ -158,6 +158,16 @@
   </section>
 
   <section>
+    <div class="sechead"><h2>In-flight work</h2></div>
+    <div class="tablewrap">
+      <table id="inflightTable">
+        <thead><tr><th>ID</th><th>Type</th><th>Status</th><th>Attempts</th><th>Worker</th><th></th></tr></thead>
+        <tbody><tr><td colspan="6" class="empty">Loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
     <div class="sechead"><h2>Workers</h2></div>
     <div class="tablewrap">
       <table id="workersTable">
@@ -318,6 +328,16 @@ async function refresh() {
     ['Oldest in-flight', inFlight.length ? ageStr(oldestAgeMs) : '<small>none</small>', false]
   ].map(([k, v, attn]) => '<div class="card' + (attn ? ' attn' : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join('');
 
+  const iTbody = document.querySelector('#inflightTable tbody');
+  if (inFlight.length === 0) {
+    iTbody.innerHTML = '<tr><td colspan="6" class="empty">Nothing waiting or in progress.</td></tr>';
+  } else {
+    iTbody.innerHTML = inFlight.map((i) =>
+      '<tr><td class="id-cell">' + esc(i.id) + '</td><td>' + esc(i.workType) + '</td><td>' + i.status + '</td><td>' + i.attempts + '</td><td>' + (i.dispatchedTo ? esc(i.dispatchedTo) : '&mdash;') + '</td>' +
+      '<td>' + (i.status === 'dispatched' ? '<button class="btn" onclick="forceRedeliver(' + JSON.stringify(i.id) + ', this)">Force redeliver</button>' : '') + '</td></tr>'
+    ).join('');
+  }
+
   const wTbody = document.querySelector('#workersTable tbody');
   if (workers.workers.length === 0) {
     wTbody.innerHTML = '<tr><td colspan="4" class="empty">No worker has reported in yet - start one to see it here.</td></tr>';
@@ -374,6 +394,25 @@ async function refresh() {
 
 refresh();
 setInterval(refresh, 1000);
+
+// Forces Core to hand this item out again even though it's still "in
+// flight" - the same thing an automatic timeout does on its own, just
+// triggered on demand. Lets a reviewer demonstrate the duplicate-delivery
+// / dedup-ledger behaviour (Phase 03) without a second terminal.
+async function forceRedeliver(id, btn) {
+  if (!confirm('Force Core to redeliver "' + id + '" right now, as if it thought the work was lost?')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const { ok, data } = await postJson('/debug/force-redeliver/' + encodeURIComponent(id));
+    if (!ok) throw new Error(data.error || 'failed');
+    refresh();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Force redeliver';
+    alert('Could not redeliver ' + id + ': ' + err.message);
+  }
+}
 
 // Sends a real termination signal to the exact worker process, using the
 // pid it last reported on its own heartbeat - the same effect as
