@@ -1,0 +1,12 @@
+{
+  "name": "nexus-practice",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NEXUS engineering challenge - practice build, Phase 1: event log + replay",
+  "main": "src/core/server.js",
+  "scripts": {
+    "start": "node src/core/server.js",
+    "worker": "node src/worker/worker.js",
+    "sender": "node src/sender/sender.js"
+  }
+}

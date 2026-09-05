@@ -1,0 +1,5 @@
+# Runtime state - the platform's durable data, not part of the submission.
+# A reviewer starts fresh; this file is created automatically on boot.
+data/
+node_modules/
+*.log

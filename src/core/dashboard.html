@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NEXUS Operator View</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel-line: #262b35; --panel-hover: #1c2029;
+    --text: #e6e8ec; --text-dim: #8b93a1;
+    --good: #3ecf8e; --good-bg: rgba(62,207,142,.10); --good-line: rgba(62,207,142,.35);
+    --warn: #e3b04b; --warn-bg: rgba(227,176,75,.10); --warn-line: rgba(227,176,75,.35);
+    --crit: #f0776b; --crit-bg: rgba(240,119,107,.12); --crit-line: rgba(240,119,107,.4);
+    --accent: #6d9eea; --accent-bg: rgba(109,158,234,.10);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 28px 20px 70px; }
+
+  header { margin-bottom: 22px; }
+  .headtop { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; }
+  h1 { font-size: 19px; margin:0; letter-spacing:.02em; display:flex; align-items:center; gap:8px; }
+  .subtitle { font-size: 13px; color: var(--text-dim); margin: 4px 0 0; }
+  .live { display:flex; align-items:center; gap:7px; font-size: 12px; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+  .dot { width:7px; height:7px; border-radius:50%; background: var(--good); flex-shrink:0; animation: pulse 2s ease-in-out infinite; }
+  .dot.off { background: var(--crit); animation: none; }
+  @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+  @media (prefers-reduced-motion: reduce) { .dot { animation: none; } }
+
+  .banner {
+    border-radius: 12px; padding: 18px 20px; margin-bottom: 22px;
+    border: 1px solid var(--panel-line); background: var(--panel);
+    transition: background-color .25s, border-color .25s;
+  }
+  .banner.good { border-color: var(--good-line); background: var(--good-bg); }
+  .banner.warn { border-color: var(--warn-line); background: var(--warn-bg); }
+  .banner.crit { border-color: var(--crit-line); background: var(--crit-bg); }
+  .banner .lbl { font-size:11px; text-transform:uppercase; letter-spacing:.08em; color: var(--text-dim); margin-bottom:8px; display:flex; align-items:center; gap:6px; }
+  .banner ul { margin: 0; padding-left: 18px; }
+  .banner li { margin: 6px 0; }
+  .banner .ok { font-size: 15.5px; font-weight: 500; }
+
+  .gridstats { display:grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap:12px; margin-bottom:26px; }
+  .card {
+    background: var(--panel); border:1px solid var(--panel-line); border-radius:12px; padding:15px 16px;
+    transition: border-color .2s;
+  }
+  .card.attn { border-color: var(--crit-line); background: var(--crit-bg); }
+  .card .k { font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); margin-bottom:7px; }
+  .card .v { font-size:25px; font-weight:600; font-variant-numeric: tabular-nums; }
+  .card .v small { font-size:13px; color:var(--text-dim); font-weight:400; }
+  .card.attn .v { color: var(--crit); }
+
+  section { margin-bottom: 30px; }
+  .sechead { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin-bottom: 12px; flex-wrap:wrap; }
+  section h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-dim); margin: 0; }
+  .count-badge {
+    font-size: 11px; font-family: ui-monospace, monospace; color: var(--text-dim);
+    background: var(--panel); border:1px solid var(--panel-line); border-radius:100px; padding: 2px 9px;
+  }
+
+  .tablewrap { overflow-x: auto; border: 1px solid var(--panel-line); border-radius: 12px; }
+  table { width:100%; border-collapse: collapse; font-size:14px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-dim); padding:10px 14px; border-bottom:1px solid var(--panel-line); white-space:nowrap; background: var(--panel); }
+  td { padding:10px 14px; border-bottom:1px solid var(--panel-line); font-variant-numeric: tabular-nums; vertical-align: middle; }
+  tbody tr:hover td { background: var(--panel-hover); }
+  tr:last-child td { border-bottom:none; }
+  .id-cell { font-family: ui-monospace, monospace; font-size: 13px; }
+
+  .pill { display:inline-flex; align-items:center; gap:5px; padding:3px 10px 3px 8px; border-radius:100px; font-size:11px; font-weight:600; text-transform:uppercase; }
+  .pill::before { content:''; width:6px; height:6px; border-radius:50%; }
+  .pill.alive { background: var(--good-bg); color: var(--good); }
+  .pill.alive::before { background: var(--good); }
+  .pill.missing { background: var(--crit-bg); color: var(--crit); }
+  .pill.missing::before { background: var(--crit); }
+  .empty { color: var(--text-dim); font-style: italic; padding: 16px 14px; }
+
+  .btn {
+    padding:6px 13px; background: var(--panel); border:1px solid var(--panel-line); border-radius:6px;
+    color: var(--text); cursor:pointer; font-size:12.5px; font-weight:500; transition: border-color .15s, background .15s;
+    white-space: nowrap;
+  }
+  .btn:hover { border-color: var(--accent); background: var(--accent-bg); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity:.5; cursor:default; }
+  .btn.primary { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+
+  .settings { font-size:13px; color:var(--text-dim); line-height:2; }
+  .settings b { color: var(--text); font-weight: 600; }
+
+  .searchrow, .submitrow { display:flex; gap:8px; margin-bottom:10px; flex-wrap: wrap; }
+  .searchrow input, .submitrow input {
+    padding:9px 12px; background: var(--panel); border:1px solid var(--panel-line);
+    border-radius:8px; color: var(--text); font-size:14px;
+  }
+  .searchrow input { flex:1; min-width:180px; }
+  .submitrow input.id { flex:1; min-width:140px; }
+  .submitrow input.type { width:170px; }
+  input::placeholder { color: #5c6270; }
+  input:focus { outline: none; border-color: var(--accent); }
+  .hint { font-size:12px; color: var(--text-dim); margin-bottom:14px; }
+  .ev-type { font-family: ui-monospace, monospace; font-size:12px; color: var(--accent); }
+  .toast { font-size: 12.5px; margin-top: 8px; min-height: 1.2em; }
+  .toast.ok { color: var(--good); }
+  .toast.err { color: var(--crit); }
+
+  @media (max-width:600px) {
+    .wrap { padding: 20px 14px 60px; }
+    th, td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="headtop">
+      <h1>NEXUS <span style="color:var(--text-dim); font-weight:400;">&middot; Operator View</span></h1>
+      <div class="live"><span class="dot" id="liveDot"></span><span id="updated">connecting&hellip;</span></div>
+    </div>
+    <p class="subtitle">What the platform is doing right now, refreshed every second. Assume you just woke up and didn't build this.</p>
+  </header>
+
+  <div class="banner" id="banner">
+    <div class="lbl">What's wrong right now</div>
+    <div id="bannerBody">Loading&hellip;</div>
+  </div>
+
+  <div class="gridstats" id="statGrid"></div>
+
+  <section>
+    <div class="sechead"><h2>Send test work</h2></div>
+    <div class="submitrow">
+      <input class="id" id="submitId" type="text" placeholder="id (leave blank to auto-generate)">
+      <input class="type" id="submitType" type="text" placeholder="type" value="demo">
+      <button class="btn primary" onclick="submitWork()">Submit</button>
+    </div>
+    <div class="toast" id="submitToast"></div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Workers</h2></div>
+    <div class="tablewrap">
+      <table id="workersTable">
+        <thead><tr><th>ID</th><th>Status</th><th>Last heartbeat</th><th></th></tr></thead>
+        <tbody><tr><td colspan="4" class="empty">Loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Live activity</h2><span class="count-badge" id="activityCount">&mdash;</span></div>
+    <div class="hint">Every event Core has recorded, newest first - what happened to which task, as it happens.</div>
+    <div class="tablewrap">
+      <table id="activityTable">
+        <thead><tr><th>Time</th><th>Event</th><th>Item / service</th><th>Details</th></tr></thead>
+        <tbody><tr><td colspan="4" class="empty">Loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Given up on (dead-lettered)</h2></div>
+    <div class="tablewrap">
+      <table id="deadTable">
+        <thead><tr><th>ID</th><th>Type</th><th>Attempts</th><th>Since</th><th>Reason</th><th></th></tr></thead>
+        <tbody><tr><td colspan="6" class="empty">Loading&hellip;</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sechead"><h2>Ask about the past</h2></div>
+    <div class="searchrow">
+      <input id="searchInput" type="text" placeholder="work item id or worker id&hellip;" onkeydown="if(event.key==='Enter')searchHistory()">
+      <button class="btn" onclick="searchHistory()">Search</button>
+    </div>
+    <div class="hint">Searches the whole event log since this Core started keeping it &ndash; no time limit at this size.</div>
+    <div class="tablewrap">
+      <table id="historyTable">
+        <thead><tr><th>Time</th><th>Event</th><th>Details</th></tr></thead>
+        <tbody><tr><td colspan="3" class="empty">Type an id above and press Search.</td></tr></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section style="margin-bottom:0">
+    <div class="sechead"><h2>Running settings</h2></div>
+    <div class="settings" id="settingsBody">Loading&hellip;</div>
+  </section>
+</div>
+
+<script>
+function durationStr(ms) {
+  if (ms < 1000) return ms + 'ms';
+  if (ms < 60000) return Math.round(ms / 1000) + 's';
+  return Math.round(ms / 60000) + 'm';
+}
+function ageStr(ms) {
+  return durationStr(ms) + ' ago';
+}
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString();
+}
+function esc(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
+}
+async function getJson(path) {
+  const res = await fetch(path);
+  return res.json();
+}
+async function postJson(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {})
+  });
+  return { ok: res.ok, status: res.status, data: await res.json() };
+}
+
+async function refresh() {
+  let status, workers, config, recentReleases, recentActivity;
+  try {
+    [status, workers, config, recentReleases, recentActivity] = await Promise.all([
+      getJson('/status'), getJson('/workers'), getJson('/config'), getJson('/history?type=release&limit=20'), getJson('/history?limit=30')
+    ]);
+    document.getElementById('liveDot').classList.remove('off');
+  } catch (err) {
+    document.getElementById('banner').className = 'banner crit';
+    document.getElementById('bannerBody').textContent = 'Cannot reach Core - is it running?';
+    document.getElementById('updated').textContent = 'last update failed';
+    document.getElementById('liveDot').classList.add('off');
+    return;
+  }
+
+  const now = Date.now();
+  const problems = [];
+
+  const deadItems = status.items.filter((i) => i.status === 'dead-lettered');
+  if (deadItems.length > 0) {
+    const earliestDeadAt = Math.min(...deadItems.map((i) => new Date(i.deadLetteredAt).getTime()));
+    let msg = deadItems.length + ' work item(s) given up on after repeated failures, first at ' + fmtTime(new Date(earliestDeadAt).toISOString()) + ' - see "Given up on" below.';
+    // R-12: "what changed just before this" is the question that solves
+    // most incidents - so answer it up front instead of making the
+    // operator go compare two screens by eye.
+    const priorRelease = recentReleases.events
+      .filter((r) => new Date(r.ts).getTime() < earliestDeadAt)
+      .sort((a, b) => new Date(b.ts) - new Date(a.ts))[0];
+    if (priorRelease) {
+      const gapMs = earliestDeadAt - new Date(priorRelease.ts).getTime();
+      if (gapMs < 5 * 60 * 1000) {
+        msg += ' Likely cause: release "' + esc(priorRelease.version) + '" for service "' + esc(priorRelease.service) + '", pushed ' + durationStr(gapMs) + ' before the first failure.';
+      }
+    }
+    problems.push(msg);
+  }
+
+  const missingWorkers = workers.workers.filter((w) => w.status === 'missing');
+  if (missingWorkers.length > 0) {
+    problems.push(missingWorkers.map((w) => {
+      const missingSinceMs = w.heartbeatAgeMs - workers.staleAfterMs;
+      return 'Worker "' + esc(w.id) + '" is not responding (last heartbeat ' + ageStr(w.heartbeatAgeMs) + ', missing for about ' + ageStr(Math.max(0, missingSinceMs)) + ').';
+    }).join(' '));
+  }
+
+  const backlogPct = status.backlog.max > 0 ? status.backlog.size / status.backlog.max : 0;
+  if (backlogPct >= 1) {
+    problems.push('Backlog is completely full (' + status.backlog.size + '/' + status.backlog.max + ') - new work is being rejected.');
+  } else if (backlogPct >= 0.8) {
+    problems.push('Backlog is nearly full (' + status.backlog.size + '/' + status.backlog.max + ').');
+  }
+
+  const inFlight = status.items.filter((i) => i.status === 'waiting' || i.status === 'dispatched');
+  let oldest = null;
+  for (const it of inFlight) {
+    const t = new Date(it.acceptedAt).getTime();
+    if (!oldest || t < oldest) oldest = t;
+  }
+  const oldestAgeMs = oldest ? (now - oldest) : 0;
+
+  const isCrit = deadItems.length > 0 || missingWorkers.length > 0 || backlogPct >= 1;
+  const banner = document.getElementById('banner');
+  const bannerBody = document.getElementById('bannerBody');
+  if (problems.length === 0) {
+    banner.className = 'banner good';
+    bannerBody.innerHTML = '<div class="ok">&#10003; Nothing abnormal right now.</div>';
+  } else {
+    banner.className = 'banner ' + (isCrit ? 'crit' : 'warn');
+    bannerBody.innerHTML = '<ul>' + problems.map((p) => '<li>' + p + '</li>').join('') + '</ul>';
+  }
+
+  const deadCount = status.counts['dead-lettered'];
+  document.getElementById('statGrid').innerHTML = [
+    ['Waiting', status.counts.waiting, false],
+    ['Dispatched', status.counts.dispatched, false],
+    ['Done', status.counts.done, false],
+    ['Dead-lettered', deadCount, deadCount > 0],
+    ['Backlog', status.backlog.size + ' <small>/ ' + status.backlog.max + '</small>', backlogPct >= 0.8],
+    ['Oldest in-flight', inFlight.length ? ageStr(oldestAgeMs) : '<small>none</small>', false]
+  ].map(([k, v, attn]) => '<div class="card' + (attn ? ' attn' : '') + '"><div class="k">' + k + '</div><div class="v">' + v + '</div></div>').join('');
+
+  const wTbody = document.querySelector('#workersTable tbody');
+  if (workers.workers.length === 0) {
+    wTbody.innerHTML = '<tr><td colspan="4" class="empty">No worker has reported in yet - start one to see it here.</td></tr>';
+  } else {
+    wTbody.innerHTML = workers.workers.map((w) =>
+      '<tr><td class="id-cell">' + esc(w.id) + '</td><td><span class="pill ' + w.status + '">' + w.status + '</span></td><td>' + ageStr(w.heartbeatAgeMs) + '</td>' +
+      '<td><button class="btn" onclick="killWorker(' + JSON.stringify(w.id) + ', this)" ' + (w.status === 'missing' ? 'disabled title="already not responding"' : '') + '>Kill</button></td></tr>'
+    ).join('');
+  }
+
+  const activityEvents = recentActivity.events.slice().reverse();
+  document.getElementById('activityCount').textContent = activityEvents.length + (recentActivity.truncated ? '+' : '');
+  const aTbody = document.querySelector('#activityTable tbody');
+  if (activityEvents.length === 0) {
+    aTbody.innerHTML = '<tr><td colspan="4" class="empty">Nothing has happened yet - send some test work above.</td></tr>';
+  } else {
+    aTbody.innerHTML = activityEvents.map((e) => {
+      const subject = e.id || e.service || '';
+      const details = Object.keys(e)
+        .filter((k) => k !== 'type' && k !== 'ts' && k !== 'id' && k !== 'service')
+        .map((k) => k + '=' + JSON.stringify(e[k]))
+        .join(', ');
+      return '<tr><td>' + fmtTime(e.ts) + '</td><td class="ev-type">' + e.type + '</td><td class="id-cell">' + esc(subject) + '</td><td>' + esc(details) + '</td></tr>';
+    }).join('');
+  }
+
+  const dTbody = document.querySelector('#deadTable tbody');
+  if (deadItems.length === 0) {
+    dTbody.innerHTML = '<tr><td colspan="6" class="empty">Nothing has been given up on.</td></tr>';
+  } else {
+    dTbody.innerHTML = deadItems.map((i) =>
+      '<tr><td class="id-cell">' + esc(i.id) + '</td><td>' + esc(i.workType) + '</td><td>' + i.attempts + '</td><td>' + fmtTime(i.deadLetteredAt) + '</td><td>' + esc(i.deadLetterReason) + '</td>' +
+      '<td><button class="btn" onclick="revive(' + JSON.stringify(i.id) + ', this)">Revive</button></td></tr>'
+    ).join('');
+  }
+
+  document.getElementById('settingsBody').innerHTML =
+    'retry &middot; first wait <b>' + config.retry.firstWaitMs + 'ms</b>, +<b>' + config.retry.backoffMs + 'ms</b>/attempt, max <b>' + config.retry.maxAttempts + '</b> attempts<br>' +
+    'heartbeat &middot; stale after <b>' + config.heartbeatStaleMs + 'ms</b><br>' +
+    'backlog &middot; max <b>' + config.maxBacklog + '</b> in flight, recovery sweep caps at <b>' + config.sweepBatchLimit + '</b>/tick';
+
+  document.getElementById('updated').textContent = 'updated ' + new Date().toLocaleTimeString();
+}
+
+refresh();
+setInterval(refresh, 1000);
+
+// Sends a real termination signal to the exact worker process, using the
+// pid it last reported on its own heartbeat - the same effect as
+// kill-worker.cmd, triggered from the page instead of a second terminal.
+async function killWorker(id, btn) {
+  if (!confirm('Kill worker "' + id + '"? This sends a real termination signal to its process.')) return;
+  btn.disabled = true;
+  btn.textContent = '…';
+  try {
+    const { ok, data } = await postJson('/debug/kill-worker/' + encodeURIComponent(id));
+    if (!ok) throw new Error(data.error || 'failed');
+    refresh();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Kill';
+    alert('Could not kill ' + id + ': ' + err.message);
+  }
+}
+
+// A real operator action, not just a test hook: giving up is reversible
+// (Section 3.4), and clicking a button beats opening a terminal for it.
+async function revive(id, btn) {
+  btn.disabled = true;
+  btn.textContent = '&hellip;';
+  try {
+    const { ok, data } = await postJson('/debug/revive/' + encodeURIComponent(id));
+    if (!ok) throw new Error(data.error || 'failed');
+    refresh();
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Revive';
+    alert('Could not revive ' + id + ': ' + err.message);
+  }
+}
+
+// Lets a reviewer push work through the system without a second terminal.
+async function submitWork() {
+  const idInput = document.getElementById('submitId');
+  const typeInput = document.getElementById('submitType');
+  const toast = document.getElementById('submitToast');
+  const id = idInput.value.trim() || ('test-' + Date.now());
+  const type = typeInput.value.trim() || 'demo';
+  toast.className = 'toast';
+  toast.textContent = 'Sending&hellip;';
+  try {
+    const { ok, data } = await postJson('/work', { id, type, body: {} });
+    if (!ok) throw new Error(data.error || 'rejected');
+    toast.className = 'toast ok';
+    toast.textContent = (data.duplicate ? 'Already existed: ' : 'Accepted: ') + id;
+    idInput.value = '';
+    refresh();
+  } catch (err) {
+    toast.className = 'toast err';
+    toast.textContent = 'Failed: ' + err.message;
+  }
+}
+document.getElementById('submitId').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitWork(); });
+
+// Tries an id search first, falls back to a worker search - lets one
+// box answer both "what happened to this work item" and "what has this
+// worker done", without asking the operator which kind of id it is.
+async function searchHistory() {
+  const q = document.getElementById('searchInput').value.trim();
+  const tbody = document.querySelector('#historyTable tbody');
+  if (!q) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Type an id above and press Search.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = '<tr><td colspan="3" class="empty">Searching&hellip;</td></tr>';
+
+  let data;
+  try {
+    data = await getJson('/history?id=' + encodeURIComponent(q));
+    if (data.count === 0) data = await getJson('/history?worker=' + encodeURIComponent(q));
+  } catch (err) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">Search failed - is Core running?</td></tr>';
+    return;
+  }
+
+  if (data.count === 0) {
+    tbody.innerHTML = '<tr><td colspan="3" class="empty">No events found for "' + esc(q) + '".</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = data.events.map((e) => {
+    const details = Object.keys(e)
+      .filter((k) => k !== 'type' && k !== 'ts')
+      .map((k) => k + '=' + JSON.stringify(e[k]))
+      .join(', ');
+    return '<tr><td>' + fmtTime(e.ts) + '</td><td class="ev-type">' + e.type + '</td><td>' + esc(details) + '</td></tr>';
+  }).join('');
+
+  if (data.truncated) {
+    tbody.innerHTML += '<tr><td colspan="3" class="empty">&hellip;older results truncated, narrow your search to see more.</td></tr>';
+  }
+}
+</script>
+</body>
+</html>
